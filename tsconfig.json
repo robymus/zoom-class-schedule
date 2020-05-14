@@ -1,0 +1,16 @@
+{
+  "include": [
+    "src/**/*"
+  ],
+  "compilerOptions": {
+    "target": "es6",
+    "rootDir": "src/",
+    "outDir": "dist",
+    "module": "None",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "sourceMap": true
+  },
+  "compileOnSave": false
+}

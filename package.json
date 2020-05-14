@@ -1,0 +1,18 @@
+{
+  "name": "molli-zoom-class-schedule",
+  "description": "Class schedule for zoom meetings with notification.",
+  "license": "Unlicense",
+  "version": "0.1.1",
+  "scripts": {
+    "build": "del-cli --force dist && tsc && copyfiles -u 1 -e **/*.ts src/* src/**/* dist",
+    "start": "npm run build -- -w"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "copyfiles": "^2.2.0",
+    "del-cli": "^3.0.0",
+    "typescript": "^3.7.5"
+  },
+  "repository": "https://github.com/robymus/molli-zoom-class-schedule",
+  "author": "Robert Elek <r@r2.io>"
+}
