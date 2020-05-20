@@ -18,13 +18,10 @@ self.addEventListener('push', function(event) {
     console.log('[Service Worker] Push Received.');
     console.log(`[Service Worker] Push had this data: "${event.data.text()}"`);
 
-    const title = event.data.title;
-    const options = {
-        body: event.data.body,
-        icon: event.data.icon,
-        badge: event.data.badge,
-        data: event.data
-    };
+    const data = JSON.parse(event.data.text());
+
+    const title = data.title;
+    const options = data.options;
 
     event.waitUntil(self.registration.showNotification(title, options));
 });

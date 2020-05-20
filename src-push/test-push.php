@@ -10,8 +10,10 @@
         "title" => "Test title",
         "options" => [
             "body" => "Test notification",
-            "icon" => "https://r2.io/favicon.ico",
-            "badge" => "https://r2.io/favicon.ico",
+            "icon" => "https://r2.io/tmp/pony.png",
+            "image" => "https://r2.io/tmp/pony.png",
+            "badge" => "https://r2.io/tmp/pony.png",
+            "requireInteraction" => true,
             "data" => [
                 "url" => "https://r2.io"
             ]
