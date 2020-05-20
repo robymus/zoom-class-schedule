@@ -54,6 +54,7 @@
 
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Headers: *");
+    header("Access-Control-Allow-Methods: *");
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'POST':
             $body = json_decode(file_get_contents('php://input'), true);
