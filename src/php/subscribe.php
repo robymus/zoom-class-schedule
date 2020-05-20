@@ -20,17 +20,21 @@
         $createTable = !file_exists($dbFile);
         $db = new SQLite3($dbFile);
         if ($createTable) {
-            $db->exec("CREATE TABLE subscriptions(id VARCHAR(64) PRIMARY KEY, data TEXT NOT NULL)");
+            $db->exec("CREATE TABLE subscriptions(id TEXT PRIMARY KEY, data TEXT NOT NULL)");
         }
         return $db;
     }
 
+    /*
+     * Get key from subscription
+     * The endpoint we are sending the push to is unique and stable
+     */
     function getKey($subscription) {
-        if (!isset($subscription) || !isset($subscription['keys']) || !isset($subscription['keys']['p256dh'])) {
+        if (!isset($subscription) || !isset($subscription['endpoint'])) {
             http_response_code(400);
             die('Bad Request');
         }
-        return $subscription['keys']['p256dh'];
+        return $subscription['endpoint'];
     }
 
     function storeSubscription($subscription) {
