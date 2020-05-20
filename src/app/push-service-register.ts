@@ -12,8 +12,10 @@ class PushServiceRegister {
     /** current subscription if user is subscribed */
     private subscription: PushSubscription;
 
+    /** URL to retrieve public keys from */
+    private readonly publicKeyURL: string;
     /** public key of our push server */
-    private readonly applicationServerPublicKey: Uint8Array;
+    private applicationServerPublicKey: Uint8Array;
     /** service worker js file path */
     private readonly serviceWorkerPath: string;
     /** url to push subscription information to */
@@ -23,12 +25,12 @@ class PushServiceRegister {
      * Creates a new instance. Do not use after construction. Call init() first, after the Promise is resolved,
      * the instance is ready to use, isSupported and isSubscribed variables are filled.
      *
-     * @param publicKeyBase64 application server public key in urlbase64 format
+     * @param publicKeyURL application server public key request URL
      * @param serviceWorkerPath service worker js file path
      * @param subscriptionPushURL url to push subscription information to (POST and DELETE methods are invoked)
      */
-    constructor(publicKeyBase64: string, serviceWorkerPath: string, subscriptionPushURL: string) {
-        this.applicationServerPublicKey = PushServiceRegister.urlB64ToUint8Array(publicKeyBase64);
+    constructor(publicKeyURL: string, serviceWorkerPath: string, subscriptionPushURL: string) {
+        this.publicKeyURL = publicKeyURL;
         this.serviceWorkerPath = serviceWorkerPath;
         this.subscriptionPushURL = subscriptionPushURL;
     }
@@ -45,9 +47,36 @@ class PushServiceRegister {
 
 
     /**
+     * Initializes service worker and checks subscription status
+     * Sets isSupported and isSubscribed, promise is always successful
      * @returns true if user is subscribed
      */
     isSubscribed():boolean { return this._isSubscribed }
+
+    init(): Promise<void> {
+        this._isSupported = this._isDenied = this._isSubscribed = false;
+        return new Promise((resolve, reject) => {
+            fetch(this.publicKeyURL)
+                .then((response) => {
+                    if (response.ok) {
+                        response.json()
+                            .then(data => {
+                                this.applicationServerPublicKey = PushServiceRegister.urlB64ToUint8Array(data.publicKey);
+                                this.pushInit().then(()=>resolve());
+                            })
+                            .catch(()=>resolve());
+                    }
+                    else {
+                        console.log("Error fetching public key:" + response.status);
+                        resolve();
+                    }
+                })
+                .catch((reason) => {
+                    console.log("Error fetching public key:" + reason);
+                    resolve();
+                });
+        });
+    }
 
     /**
      * Initializes service worker and checks subscription status
@@ -55,8 +84,7 @@ class PushServiceRegister {
      *
      * @returns always successful promise, use isSupported and isSubscribed to check status
      */
-    init(): Promise<void> {
-        this._isSupported = this._isDenied = this._isSubscribed = false;
+    private pushInit(): Promise<void> {
         if ('serviceWorker' in navigator && 'PushManager' in window) {
             // check if site has permission for notifications
             if (Notification.permission === "denied") {
@@ -73,20 +101,9 @@ class PushServiceRegister {
                             .then((subscription) => {
                                 if (subscription !== null) {
                                     this.subscription = subscription;
-                                    this.pushSubscriptionToServer()
-                                        .then(() => {
-                                            this._isSubscribed = true;
-                                            resolve();
-                                        })
-                                        .catch((reason) => {
-                                            console.log("Error pushing subscription info to server: "+reason);
-                                            resolve();
-                                        })
+                                    this._isSubscribed = true;
                                 }
-                                else {
-                                    // not subscribed yet
-                                    resolve();
-                                }
+                                resolve();
                             })
                             .catch((reason) => resolve());
                     })
@@ -102,20 +119,23 @@ class PushServiceRegister {
      *
      * @returns promise resolved on completion, or error
      */
-    private pushSubscriptionToServer(): Promise<void> {
+    private pushSubscriptionToServer(password:String): Promise<void> {
         return new Promise((resolve, reject) => {
             fetch(this.subscriptionPushURL, {
                 method: "POST",
-                body: JSON.stringify(this.subscription),
+                body: JSON.stringify({
+                    "password": password,
+                    "subscription": this.subscription
+                }),
                 headers: {
                     'Content-Type': 'application/json'
                 }
             })
                 .then((response) => {
                     if (response.ok) resolve();
-                    else reject("Error pushing subscription information to server: "+response.status);
+                    else reject({reason: "Error pushing subscription information to server: ", code: response.status});
                 })
-                .catch((reason) => reject(reason));
+                .catch((reason) => reject({reason: reason, code: -1}));
         });
     }
 
@@ -128,16 +148,18 @@ class PushServiceRegister {
         return new Promise((resolve, reject) => {
             fetch(this.subscriptionPushURL, {
                 method: "DELETE",
-                body: JSON.stringify(this.subscription),
+                body: JSON.stringify({
+                    "subscription": this.subscription
+                }),
                 headers: {
                     'Content-Type': 'application/json'
                 }
             })
                 .then((response) => {
                     if (response.ok) resolve();
-                    else reject("Error deleting subscription information on server: "+response.status);
+                    else reject({reason: "Error deleting subscription information on server: ", code: response.status});
                 })
-                .catch((reason) => reject(reason));
+                .catch((reason) => reject({reason: reason, code: -1}));
         });
     }
 
@@ -145,9 +167,10 @@ class PushServiceRegister {
     /**
      * If user is not subscribed, subscribe to notifications
      *
+     * @param password the password to send to the server for subscribing
      * @returns promise resolved on success, or error
      */
-    subscribe(): Promise<void> {
+    subscribe(password: String): Promise<void> {
         if (this._isSubscribed) return Promise.resolve();
         return new Promise((resolve, reject) => {
             this.swReg.pushManager.subscribe({
@@ -156,14 +179,19 @@ class PushServiceRegister {
             })
                 .then((subscription) => {
                     this.subscription = subscription;
-                    this.pushSubscriptionToServer()
+                    this.pushSubscriptionToServer(password)
                         .then(() => {
                             this._isSubscribed = true;
                             resolve();
                         })
-                        .catch((reason) => reject(reason));
+                        .catch((reasonObj) => {
+                            // failed, so delete local subscription as well
+                            this.subscription.unsubscribe()
+                                .then(()=>reject(reasonObj))
+                                .catch(()=>reject(reasonObj));
+                        });
                 })
-                .catch((reason) => reject(reason));
+                .catch((reason) => reject({reason: reason, code: -1}));
         });
     }
 
@@ -178,15 +206,16 @@ class PushServiceRegister {
             this.subscription.unsubscribe()
                 .then((successful) => {
                     if (successful) {
+                        this._isSubscribed = false;
                         this.deleteSubscriptionOnServer()
                             .then(() => resolve())
-                            .catch((reason) => reject(reason));
+                            .catch((reasonObj) => reject(reasonObj));
                     }
                     else {
-                        reject("Unsubscription failed");
+                        reject({reason: "Unsubscription failed", code: -1});
                     }
                 })
-                .catch((reason) => reject(reason))
+                .catch((reason) => reject({reason: reason, code: -1}))
         });
     }
 

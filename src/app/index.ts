@@ -1,8 +1,8 @@
-const applicationServerKey = "BMe3HIpUhUxzrCRbjlOOOllTRIM8ju-5CDsDfNNUVHuWcOgmqWHDDl_uhA6kpe8vfclnGII80OfTIDvMQC-_yVM";
 const serviceWorkerPath = "/push-service-worker.js";
-const subscriptionPushURL = "subscribe.php";
+const subscriptionPushURL = "php/subscribe.php";
+const publicKeyURL = "php/pubkey.php";
 
-const pushReg = new PushServiceRegister(applicationServerKey, serviceWorkerPath, subscriptionPushURL);
+const pushReg = new PushServiceRegister(publicKeyURL, serviceWorkerPath, subscriptionPushURL);
 
 document.addEventListener("DOMContentLoaded", () => {
     pushReg.init().then(() => {
@@ -13,7 +13,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function doSubscribe():void {
-    pushReg.subscribe()
+    pushReg.subscribe('password')
         .then(()=>console.log("subscribed"))
+        .catch((err)=>console.log(err));
+}
+
+function doUnsubscribe():void {
+    pushReg.unsubscribe()
+        .then(()=>console.log("unsubscribed"))
         .catch((err)=>console.log(err));
 }
